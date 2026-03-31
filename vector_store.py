@@ -9,12 +9,18 @@ class SimpleEmbeddings:
     
     def __init__(self):
         self.vectorizer = TfidfVectorizer(max_features=384)  # 限制特征数量
+        self.is_fitted = False  # 标记向量器是否已经训练过
     
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """将文档列表转换为嵌入向量"""
         try:
-            # 使用 TF-IDF 向量化
-            vectors = self.vectorizer.fit_transform(texts).toarray()
+            if not self.is_fitted:
+                # 第一次调用，训练向量器
+                vectors = self.vectorizer.fit_transform(texts).toarray()
+                self.is_fitted = True
+            else:
+                # 后续调用，使用已训练的向量器
+                vectors = self.vectorizer.transform(texts).toarray()
             return vectors.tolist()
         except Exception as e:
             print(f"嵌入文档时出错: {e}")
@@ -24,13 +30,20 @@ class SimpleEmbeddings:
     def embed_query(self, text: str) -> List[float]:
         """将查询文本转换为嵌入向量"""
         try:
-            # 使用相同的向量化器
+            if not self.is_fitted:
+                # 如果向量器还没有训练过，返回零向量
+                return [0.0] * 384
+            # 使用已训练的向量器
             vector = self.vectorizer.transform([text]).toarray()
             return vector[0].tolist()
         except Exception as e:
             print(f"嵌入查询时出错: {e}")
             # 如果失败，返回零向量
             return [0.0] * 384
+    
+    def __call__(self, text: str) -> List[float]:
+        """使 SimpleEmbeddings 成为可调用对象，用于 FAISS 内部调用"""
+        return self.embed_query(text)
 
 class VectorStoreManager:
     """向量存储管理器，用于文档向量化和检索"""
@@ -101,6 +114,8 @@ class VectorStoreManager:
         """清空向量存储"""
         try:
             self.vector_store = None
+            # 重置嵌入模型，以便下次添加文档时重新训练
+            self.embeddings = SimpleEmbeddings()
             return "向量存储已清空"
         except Exception as e:
             return f"清空向量存储时出错: {str(e)}"
