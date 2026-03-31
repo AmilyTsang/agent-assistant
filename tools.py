@@ -46,6 +46,52 @@ def get_current_time() -> str:
     now = datetime.now()
     return f"当前时间: {now.strftime('%Y-%m-%d %H:%M:%S')}"
 
+# 医疗术语解释工具
+class MedicalTermInput(BaseModel):
+    term: str = Field(description="医疗术语，例如：高血压")
+
+def explain_medical_term(term: str) -> str:
+    """解释医疗术语的含义"""
+    try:
+        # 这里可以集成专业的医疗术语API，现在使用模拟数据
+        medical_terms = {
+            "高血压": "高血压是指动脉血压持续升高，收缩压≥140mmHg和/或舒张压≥90mmHg。长期高血压可导致心脏病、脑卒中等并发症。",
+            "糖尿病": "糖尿病是一种代谢性疾病，特征是血糖水平持续升高。主要分为1型和2型，需要通过饮食控制、运动和药物治疗。",
+            "冠心病": "冠心病是由于冠状动脉粥样硬化导致心肌缺血缺氧的疾病，常见症状为心绞痛、心肌梗死等。",
+            "脑卒中": "脑卒中又称中风，是由于脑部血管阻塞或破裂导致脑组织损伤的疾病，可分为缺血性和出血性两种。",
+            "癌症": "癌症是由细胞异常增生形成的恶性肿瘤，可发生在身体的任何部位，早期发现和治疗至关重要。"
+        }
+        
+        if term in medical_terms:
+            return f"{term}：{medical_terms[term]}"
+        else:
+            return f"未找到{term}的详细解释，建议咨询专业医生。"
+    except Exception as e:
+        return f"解释医疗术语时出错: {str(e)}"
+
+# 药品信息查询工具
+class DrugInfoInput(BaseModel):
+    drug_name: str = Field(description="药品名称，例如：阿司匹林")
+
+def get_drug_info(drug_name: str) -> str:
+    """查询药品的基本信息"""
+    try:
+        # 这里可以集成专业的药品信息API，现在使用模拟数据
+        drugs = {
+            "阿司匹林": "阿司匹林是一种非甾体抗炎药，具有解热、镇痛、抗炎和抗血小板聚集作用。常用于缓解疼痛、降低体温、预防心脑血管疾病等。",
+            "布洛芬": "布洛芬是一种非甾体抗炎药，具有解热、镇痛、抗炎作用。常用于缓解轻至中度疼痛，如头痛、关节痛、牙痛等。",
+            "对乙酰氨基酚": "对乙酰氨基酚是一种解热镇痛药，主要用于缓解疼痛和降低体温，对炎症的作用较弱。",
+            "青霉素": "青霉素是一种抗生素，用于治疗细菌感染，如肺炎、扁桃体炎、中耳炎等。",
+            "胰岛素": "胰岛素是一种激素，用于治疗糖尿病，帮助调节血糖水平。"
+        }
+        
+        if drug_name in drugs:
+            return f"{drug_name}：{drugs[drug_name]}"
+        else:
+            return f"未找到{drug_name}的详细信息，建议咨询专业医生或药师。"
+    except Exception as e:
+        return f"查询药品信息时出错: {str(e)}"
+
 # 定义工具
 tools = [
     Tool(
@@ -64,5 +110,17 @@ tools = [
         name="CurrentTime",
         func=get_current_time,
         description="获取当前时间"
+    ),
+    Tool(
+        name="MedicalTerm",
+        func=explain_medical_term,
+        description="用于解释医疗术语的含义",
+        args_schema=MedicalTermInput
+    ),
+    Tool(
+        name="DrugInfo",
+        func=get_drug_info,
+        description="用于查询药品的基本信息",
+        args_schema=DrugInfoInput
     )
 ]
