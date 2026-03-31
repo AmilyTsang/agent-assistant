@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能助手 Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        
+        .chat-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .chat-messages {
+            height: 500px;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            line-height: 1.4;
+        }
+        
+        .user-message {
+            background-color: #e3f2fd;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+            margin-left: auto;
+        }
+        
+        .agent-message {
+            background-color: #f1f1f1;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .input-area {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #e0e0e0;
+            background-color: #fafafa;
+        }
+        
+        .input-area input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 16px;
+            outline: none;
+        }
+        
+        .input-area button {
+            margin-left: 10px;
+            padding: 0 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .input-area button:hover {
+            background-color: #2980b9;
+        }
+        
+        .input-area .clear-button {
+            background-color: #95a5a6;
+        }
+        
+        .input-area .clear-button:hover {
+            background-color: #7f8c8d;
+        }
+        
+        .status {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .chat-messages {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>智能助手 Agent</h1>
+        
+        <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message agent-message">
+                    你好！我是你的智能助手，有什么可以帮助你的吗？
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <input type="text" id="userInput" placeholder="请输入你的问题..." autocomplete="off">
+                <button id="clearButton" class="clear-button">清空</button>
+                <button id="sendButton">发送</button>
+            </div>
+        </div>
+        
+        <div class="status" id="status">
+            就绪
+        </div>
+    </div>
+    
+    <script>
+        // 发送消息到后端
+        async function sendMessage(userInput) {
+            try {
+                const response = await fetch('http://localhost:5000/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: userInput })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('网络响应错误');
+                }
+                
+                const data = await response.json();
+                return data.response;
+            } catch (error) {
+                console.error('发送消息失败:', error);
+                throw error;
+            }
+        }
+        
+        // 清空历史
+        async function clearHistory() {
+            try {
+                const response = await fetch('http://localhost:5000/api/clear', {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('清空历史失败');
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('清空历史失败:', error);
+                throw error;
+            }
+        }
+        
+        // 添加消息到聊天界面
+        function addMessage(content, isUser = false) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'agent-message'}`;
+            messageDiv.textContent = content;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // 处理发送按钮点击
+        document.getElementById('sendButton').addEventListener('click', async () => {
+            const userInput = document.getElementById('userInput').value.trim();
+            if (userInput) {
+                addMessage(userInput, true);
+                document.getElementById('userInput').value = '';
+                
+                document.getElementById('status').textContent = '思考中...';
+                
+                try {
+                    const response = await sendMessage(userInput);
+                    addMessage(response);
+                } catch (error) {
+                    addMessage('抱歉，我遇到了一些问题，请稍后再试。');
+                } finally {
+                    document.getElementById('status').textContent = '就绪';
+                }
+            }
+        });
+        
+        // 处理清空按钮点击
+        document.getElementById('clearButton').addEventListener('click', async () => {
+            try {
+                await clearHistory();
+                document.getElementById('chatMessages').innerHTML = '';
+                addMessage('你好！我是你的智能助手，有什么可以帮助你的吗？');
+            } catch (error) {
+                console.error('清空历史失败:', error);
+            }
+        });
+        
+        // 处理回车键发送
+        document.getElementById('userInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('sendButton').click();
+            }
+        });
+    </script>
+</body>
+</html>
