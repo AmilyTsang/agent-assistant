@@ -85,7 +85,7 @@ class VectorStoreManager:
                     metadatas=metadatas
                 )
             
-            return f"文档已成功添加到向量存储，共分割为 {len(texts)} 个片段"
+            return "上传成功"
         except Exception as e:
             return f"添加文档到向量存储时出错: {str(e)}"
     

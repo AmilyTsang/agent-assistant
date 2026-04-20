@@ -19,7 +19,7 @@
         }
         
         .container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -41,12 +41,54 @@
             font-size: 1.1rem;
         }
         
+        .main-content {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        
+        .left-section {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .right-section {
+            flex: 1;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+        
+        .right-section::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .right-section::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        .right-section::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 10px;
+        }
+        
+        .right-section::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+        
         .upload-section {
             background-color: white;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            padding: 25px;
-            margin-bottom: 25px;
+            padding: 20px;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         
@@ -56,8 +98,8 @@
         }
         
         .upload-section h2 {
-            font-size: 1.3rem;
-            margin-bottom: 20px;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
             color: #34495e;
             display: flex;
             align-items: center;
@@ -71,7 +113,7 @@
         .upload-area {
             border: 2px dashed #ddd;
             border-radius: 10px;
-            padding: 40px;
+            padding: 20px;
             text-align: center;
             transition: all 0.3s ease;
             background-color: #fafafa;
@@ -88,13 +130,13 @@
         
         .upload-area label {
             display: inline-block;
-            padding: 12px 24px;
+            padding: 10px 20px;
             background-color: #3498db;
             color: white;
             border-radius: 25px;
             cursor: pointer;
             transition: all 0.3s ease;
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 500;
             box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
         }
@@ -106,23 +148,23 @@
         }
         
         .upload-area p {
-            margin-top: 15px;
+            margin-top: 10px;
             color: #666;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
         }
         
         .document-list {
-            margin-top: 20px;
+            margin-top: 15px;
         }
         
         .document-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 15px;
+            padding: 8px 12px;
             background-color: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
             transition: all 0.3s ease;
             border-left: 4px solid #3498db;
         }
@@ -133,7 +175,7 @@
         }
         
         .document-item .file-name {
-            font-size: 14px;
+            font-size: 12px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -146,8 +188,8 @@
             color: white;
             border: none;
             border-radius: 4px;
-            padding: 6px 12px;
-            font-size: 12px;
+            padding: 4px 8px;
+            font-size: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
         }
@@ -163,6 +205,8 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            flex: 1;
+            min-height: 600px;
         }
         
         .chat-container:hover {
@@ -335,7 +379,59 @@
             font-weight: 500;
         }
         
+        .capabilities-section {
+            margin-top: 20px;
+        }
+        
+        .capabilities-section h3 {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            color: #34495e;
+            display: flex;
+            align-items: center;
+        }
+        
+        .capabilities-section h3 i {
+            margin-right: 8px;
+            color: #3498db;
+        }
+        
+        .capabilities-list {
+            list-style: none;
+        }
+        
+        .capabilities-list li {
+            margin-bottom: 10px;
+            padding-left: 20px;
+            position: relative;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .capabilities-list li:hover {
+            color: #3498db;
+            transform: translateX(5px);
+        }
+        
+        .capabilities-list li:before {
+            content: "•";
+            color: #3498db;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+        
         @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .right-section {
+                position: static;
+                max-height: none;
+            }
+            
             .container {
                 padding: 15px;
             }
@@ -346,11 +442,11 @@
             
             .upload-section,
             .chat-container {
-                padding: 20px;
+                padding: 15px;
             }
             
             .upload-area {
-                padding: 30px;
+                padding: 15px;
             }
             
             .chat-messages {
@@ -386,12 +482,12 @@
             }
             
             .upload-area {
-                padding: 20px;
+                padding: 15px;
             }
             
             .upload-area label {
-                padding: 10px 20px;
-                font-size: 0.9rem;
+                padding: 8px 16px;
+                font-size: 0.8rem;
             }
             
             .chat-messages {
@@ -407,39 +503,94 @@
             <p class="subtitle">上传医疗研报，获取专业分析和问答</p>
         </header>
         
-        <div class="upload-section">
-            <h2><i class="fas fa-file-upload"></i>文档上传</h2>
-            <div class="upload-area">
-                <input type="file" id="fileInput" accept=".pdf,.docx">
-                <label for="fileInput">选择医疗研报文件 (PDF/DOCX)</label>
-                <p>支持 PDF 和 Word 格式的医疗行业研报</p>
-            </div>
-            <div class="document-list" id="documentList">
-                <!-- 文档列表将在这里动态生成 -->
-            </div>
-        </div>
-        
-        <div class="chat-container">
-            <div class="chat-header">
-                <i class="fas fa-comments"></i> 智能问答
-            </div>
-            <div class="chat-messages" id="chatMessages">
-                <div class="message agent-message">
-                    你好！我是医疗行业研报智能助手，上传文档后我可以帮你分析并回答相关问题。
-                    <div class="message-time">刚刚</div>
+        <div class="main-content">
+            <!-- 左侧：上传和聊天 -->
+            <div class="left-section">
+                <div class="upload-section">
+                    <h2><i class="fas fa-file-upload"></i>文档上传</h2>
+                    <div class="upload-area">
+                        <input type="file" id="fileInput" accept=".pdf,.docx">
+                        <label for="fileInput">选择医疗研报文件 (PDF/DOCX)</label>
+                        <p>支持 PDF 和 Word 格式的医疗行业研报</p>
+                    </div>
+                    <div class="document-list" id="documentList">
+                        <!-- 文档列表将在这里动态生成 -->
+                    </div>
+                </div>
+                
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <i class="fas fa-comments"></i> 智能问答
+                    </div>
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message agent-message">
+                            你好！我是医疗行业研报智能助手，上传文档后我可以帮你分析并回答相关问题。
+                            <div class="message-time">刚刚</div>
+                        </div>
+                    </div>
+                    
+                    <div class="input-area">
+                        <input type="text" id="userInput" placeholder="请输入你的问题..." autocomplete="off">
+                        <button id="clearButton" class="clear-button">清空历史</button>
+                        <button id="clearDocsButton" class="clear-docs-button">清空文档</button>
+                        <button id="sendButton">发送</button>
+                    </div>
+                </div>
+                
+                <div class="status" id="status">
+                    就绪
                 </div>
             </div>
             
-            <div class="input-area">
-                <input type="text" id="userInput" placeholder="请输入你的问题..." autocomplete="off">
-                <button id="clearButton" class="clear-button">清空历史</button>
-                <button id="clearDocsButton" class="clear-docs-button">清空文档</button>
-                <button id="sendButton">发送</button>
+            <!-- 右侧：助手能力说明 -->
+            <div class="right-section">
+                <h2><i class="fas fa-robot"></i>助手能力</h2>
+                <div class="capabilities-section">
+                    <h3><i class="fas fa-check-circle"></i>我能帮您：</h3>
+                    <ul class="capabilities-list">
+                        <li>分析医疗研报内容和数据</li>
+                        <li>提取研报中的关键信息和观点</li>
+                        <li>回答关于研报内容的专业问题</li>
+                        <li>总结研报的主要发现和结论</li>
+                        <li>提供研报相关的行业洞察</li>
+                        <li>解释医疗术语的含义</li>
+                        <li>查询药品的基本信息</li>
+                        <li>以清晰的分点格式回答问题</li>
+                        <li>支持多轮对话和上下文理解</li>
+                    </ul>
+                </div>
+                
+                <div class="capabilities-section">
+                    <h3><i class="fas fa-file-alt"></i>支持的文档：</h3>
+                    <ul class="capabilities-list">
+                        <li>PDF 格式的医疗研报</li>
+                        <li>Word 文档 (.docx)</li>
+                    </ul>
+                </div>
+                
+                <div class="capabilities-section">
+                    <h3><i class="fas fa-pills"></i>药品示例：</h3>
+                    <ul class="capabilities-list">
+                        <li onclick="setExampleQuestion('阿司匹林的作用是什么？')">阿司匹林</li>
+                        <li onclick="setExampleQuestion('布洛芬的作用是什么？')">布洛芬</li>
+                        <li onclick="setExampleQuestion('对乙酰氨基酚的作用是什么？')">对乙酰氨基酚</li>
+                        <li onclick="setExampleQuestion('青霉素的作用是什么？')">青霉素</li>
+                        <li onclick="setExampleQuestion('胰岛素的作用是什么？')">胰岛素</li>
+                    </ul>
+                </div>
+                
+                <div class="capabilities-section">
+                    <h3><i class="fas fa-question-circle"></i>示例问题：</h3>
+                    <ul class="capabilities-list">
+                        <li onclick="setExampleQuestion('这份研报的主要发现是什么？')">这份研报的主要发现是什么？</li>
+                        <li onclick="setExampleQuestion('请分析这份文档的核心观点')">请分析这份文档的核心观点</li>
+                        <li onclick="setExampleQuestion('研报中提到了哪些治疗方案？')">研报中提到了哪些治疗方案？</li>
+                        <li onclick="setExampleQuestion('请总结这份研报的结论')">请总结这份研报的结论</li>
+                        <li onclick="setExampleQuestion('请解释什么是高血压？')">请解释什么是高血压？</li>
+                        <li onclick="setExampleQuestion('阿司匹林的作用是什么？')">阿司匹林的作用是什么？</li>
+                    </ul>
+                </div>
             </div>
-        </div>
-        
-        <div class="status" id="status">
-            就绪
         </div>
     </div>
     
@@ -540,8 +691,11 @@
             const now = new Date();
             const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
+            // 将换行符转换为HTML换行标签
+            const formattedContent = content.replace(/\n/g, '<br>');
+            
             messageDiv.innerHTML = `
-                ${content}
+                ${formattedContent}
                 <div class="message-time">${time}</div>
             `;
             
@@ -609,13 +763,41 @@
                 addMessage(userInput, true);
                 document.getElementById('userInput').value = '';
                 
-                document.getElementById('status').innerHTML = '<div class="loading-text"><div class="loading"></div>思考中...</div>';
+                // 在用户消息下方显示思考中提示
+                const chatMessages = document.getElementById('chatMessages');
+                const thinkingDiv = document.createElement('div');
+                thinkingDiv.className = 'message agent-message';
+                thinkingDiv.id = 'thinkingIndicator';
+                thinkingDiv.innerHTML = `
+                    <div class="loading-text">
+                        <div class="loading"></div>
+                        <span>思考中...</span>
+                    </div>
+                `;
+                chatMessages.appendChild(thinkingDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
                 
                 try {
+                    // 增加思考时间，模拟AI思考过程
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
                     const response = await sendMessage(userInput);
+                    
+                    // 移除思考中提示
+                    const thinkingIndicator = document.getElementById('thinkingIndicator');
+                    if (thinkingIndicator) {
+                        thinkingIndicator.remove();
+                    }
+                    
                     addMessage(response);
                     document.getElementById('status').textContent = '就绪';
                 } catch (error) {
+                    // 移除思考中提示
+                    const thinkingIndicator = document.getElementById('thinkingIndicator');
+                    if (thinkingIndicator) {
+                        thinkingIndicator.remove();
+                    }
+                    
                     addMessage('抱歉，我遇到了一些问题，请稍后再试', false);
                     document.getElementById('status').innerHTML = '<span class="error-message">请求失败</span>';
                     setTimeout(() => {
@@ -670,6 +852,13 @@
                 document.getElementById('sendButton').click();
             }
         });
+        
+        // 设置示例问题到输入框
+        function setExampleQuestion(question) {
+            document.getElementById('userInput').value = question;
+            // 聚焦到输入框，方便用户直接发送
+            document.getElementById('userInput').focus();
+        }
         
         // 处理页面加载
         window.addEventListener('load', () => {
