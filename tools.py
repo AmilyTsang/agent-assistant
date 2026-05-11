@@ -1,5 +1,12 @@
-from langchain_core.tools import Tool
-from pydantic import BaseModel, Field
+try:
+    from langchain.tools import Tool
+except ImportError:
+    from langchain_core.tools import Tool
+
+try:
+    from pydantic.v1 import BaseModel, Field
+except ImportError:
+    from pydantic import BaseModel, Field
 import requests
 import json
 from datetime import datetime

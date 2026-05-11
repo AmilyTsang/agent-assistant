@@ -2,9 +2,20 @@ from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+try:
+    from langchain.chat_models import ChatOpenAI
+except ImportError:
+    from langchain_openai import ChatOpenAI
+
+try:
+    from langchain.prompts import ChatPromptTemplate
+except ImportError:
+    from langchain_core.prompts import ChatPromptTemplate
+
+try:
+    from langchain.output_parsers import StrOutputParser
+except ImportError:
+    from langchain_core.output_parsers import StrOutputParser
 from rich.console import Console
 from rich.markdown import Markdown
 from tools import tools
@@ -160,10 +171,14 @@ class MedicalReportAgent:
         return self.vector_store.clear()
 
 # 初始化agent
-API_KEY = "5ca9614f9547435cacc565406cfae07d.U6QspPTBOgyM0Ur8"  # 替换为你的实际API Key
-MODEL = "glm-5.1"  # 可以选择其他模型，如"gpt-4"
-TEMPERATURE = 0.7  # 控制输出的随机性，0.0-1.0之间
-BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"  # 只包含基础API端点
+API_KEY = os.getenv("OPENAI_API_KEY", "5ca9614f9547435cacc565406cfae07d.U6QspPTBOgyM0Ur8")  # 从环境变量读取，或使用默认值
+MODEL = os.getenv("MODEL", "glm-5.1")  # 可以选择其他模型，如"gpt-4"
+TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))  # 控制输出的随机性，0.0-1.0之间
+BASE_URL = os.getenv("BASE_URL", "https://open.bigmodel.cn/api/paas/v4/")  # 只包含基础API端点
+
+# 验证API Key是否设置
+if not API_KEY or API_KEY == "your-openai-api-key":
+    raise ValueError("请在.env文件中设置OPENAI_API_KEY环境变量")
 
 agent = MedicalReportAgent(api_key=API_KEY, model=MODEL, temperature=TEMPERATURE, base_url=BASE_URL)
 

@@ -1,8 +1,19 @@
 import os
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+try:
+    from langchain.chat_models import ChatOpenAI
+except ImportError:
+    from langchain_openai import ChatOpenAI
+
+try:
+    from langchain.prompts import ChatPromptTemplate
+except ImportError:
+    from langchain_core.prompts import ChatPromptTemplate
+
+try:
+    from langchain.output_parsers import StrOutputParser
+except ImportError:
+    from langchain_core.output_parsers import StrOutputParser
 from rich.console import Console
 from rich.markdown import Markdown
 from tools import tools
