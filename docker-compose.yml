@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  medical-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: medical-report-agent:latest
+    container_name: medical-report-agent
+    ports:
+      - "5000:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MODEL=glm-5v-turbo
+      - BASE_URL=https://open.bigmodel.cn/api/paas/v4/
+      - TEMPERATURE=0.7
+      - USE_LOCAL_MODEL=false
+      - LORA_PATH=./lora_medical_terms
+      - ENABLE_PLANNING=true
+    volumes:
+      - ./temp:/app/temp
+      - ./data:/app/data
+    restart: unless-stopped
+    networks:
+      - medical-agent-network
+
+networks:
+  medical-agent-network:
+    driver: bridge

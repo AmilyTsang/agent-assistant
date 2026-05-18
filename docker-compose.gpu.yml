@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  medical-agent-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: medical-report-agent:gpu
+    container_name: medical-report-agent-gpu
+    ports:
+      - "5000:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MODEL=glm-5v-turbo
+      - BASE_URL=https://open.bigmodel.cn/api/paas/v4/
+      - USE_LOCAL_MODEL=true
+      - LORA_PATH=./lora_medical_terms
+    volumes:
+      - ./temp:/app/temp
+      - ./data:/app/data
+      - ./lora_medical_terms:/app/lora_medical_terms
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
