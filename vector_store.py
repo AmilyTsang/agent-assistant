@@ -46,14 +46,14 @@ class SimpleEmbeddings:
         return self.embed_query(text)
 
 class VectorStoreManager:
-    """向量存储管理器，用于文档向量化和检索"""
+    """向量存储管理器，支持混合检索优化的文档向量化和检索系统"""
     
-    def __init__(self, api_key=None, base_url=None):
+    def __init__(self, api_key=None, base_url=None, enable_hybrid_search=True):
         """初始化向量存储管理器"""
-        # 初始化嵌入模型 - 使用简单的本地嵌入
+        # 初始化嵌入模型 - 使用简单的本地嵌入（TF-IDF）
         self.embeddings = SimpleEmbeddings()
         
-        # 初始化文本分割器
+        # 初始化文本分割器（支持自适应动态窗口）
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
@@ -62,6 +62,16 @@ class VectorStoreManager:
         
         # 初始化向量存储
         self.vector_store = None
+        
+        # 混合检索开关
+        self.enable_hybrid_search = enable_hybrid_search
+        
+        # 存储原始文档片段用于融合排序
+        self.document_chunks = []
+        
+        # 统计信息
+        self.total_documents = 0
+        self.total_chunks = 0
     
     def add_document(self, text, metadata=None):
         """添加文档到向量存储"""
