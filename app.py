@@ -1,483 +1,324 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import torch
+from datetime import datetime
 from dotenv import load_dotenv
 
-# 导入LoRA相关库（可选导入）
+# ========================
+# 安全导入（Qwen2 专用）
+# ========================
 try:
     from transformers import AutoTokenizer, AutoModelForCausalLM
-    from peft import PeftModel
+    from peft import PeftModel, PeftConfig
     HAS_PEFT = True
-except ImportError:
+    print("✅ Transformers & PEFT 库已加载")
+except ImportError as e:
     HAS_PEFT = False
+    print(f"⚠️ 缺少必要库: {e}")
 
-try:
-    from langchain.chat_models import ChatOpenAI
-except ImportError:
-    from langchain_openai import ChatOpenAI
-
-try:
-    from langchain.prompts import ChatPromptTemplate
-except ImportError:
-    from langchain_core.prompts import ChatPromptTemplate
-
-try:
-    from langchain.output_parsers import StrOutputParser
-except ImportError:
-    from langchain_core.output_parsers import StrOutputParser
-
-# 导入Agent相关模块
-try:
-    from langchain.agents import initialize_agent, AgentType
-    from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory
-    HAS_AGENT = True
-except ImportError:
-    HAS_AGENT = False
-
-from tools import tools
-from document_parser import DocumentParser
-from vector_store import VectorStoreManager
-
-# 加载环境变量
 load_dotenv()
 
+API_KEY = os.getenv("OPENAI_API_KEY")
+MODEL = os.getenv("MODEL", "glm-5v-turbo")
+BASE_URL = os.getenv("BASE_URL", "https://open.bigmodel.cn/api/paas/v4/")
+TEMPERATURE = float(os.getenv("TEMPERATURE", 0.7))
+LORA_PATH = os.getenv("LORA_PATH", "./lora_medical_sampled")
+PORT = int(os.getenv("PORT", 5000))
+
+# 你的本地 Qwen 模型路径
+LOCAL_QWEN_PATH = r"C:\Users\15637\Desktop\个人项目总结\算法所有的项目上传版\agent-assistant\models\Qwen\Qwen2___5-3B-Instruct"
+
 app = Flask(__name__)
-CORS(app)  # 启用CORS
+CORS(app)
 
-class MedicalReportAgent:
-    def __init__(self, api_key=None, model="gpt-3.5-turbo", temperature=0.7, 
-                 base_url=None, use_local_model=False, lora_path=None,
-                 max_history_length=20, enable_planning=True):
-        # 初始化文档解析器
-        self.parser = DocumentParser()
-        
-        # 初始化向量存储管理器
-        self.vector_store = VectorStoreManager(api_key=api_key, base_url=base_url)
-        
-        # 配置参数
-        self.max_history_length = max_history_length
-        self.enable_planning = enable_planning
-        self.max_retries = 3
-        
-        # 对话历史
-        self.history = []
-        self.history_summary = ""
-        
-        # 选择模型类型
-        self.use_local_model = use_local_model
-        
-        if use_local_model and lora_path and HAS_PEFT:
-            # 使用本地LoRA微调模型
-            self.llm = self._load_local_lora_model(lora_path)
-            print(f"已加载本地LoRA模型: {lora_path}")
-            self.enable_planning = False  # 本地模型暂不支持AgentExecutor
-        else:
-            # 使用API调用方式
-            self.llm = ChatOpenAI(
-                model=model,
-                temperature=temperature,
-                api_key=api_key,
-                base_url=base_url
-            )
-            print(f"已加载API模型: {model}")
-            
-            # 初始化AgentExecutor（具备规划能力）
-            if HAS_AGENT and self.enable_planning:
-                self._init_agent_executor()
-        
-    def _load_local_lora_model(self, lora_path):
-        """加载本地LoRA微调模型"""
-        base_model_name = "THUDM/glm-4-6b-chat"
-        
-        tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
-        model = AutoModelForCausalLM.from_pretrained(
-            base_model_name,
-            torch_dtype=torch.float16,
-            device_map="auto",
-            trust_remote_code=True
-        )
-        
-        # 加载LoRA权重
-        model = PeftModel.from_pretrained(model, lora_path)
-        model.eval()
-        
-        return (model, tokenizer)
-    
-    def _init_agent_executor(self):
-        """初始化具备规划能力的AgentExecutor"""
-        # 创建记忆系统
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True,
-            max_len=self.max_history_length
-        )
-        
-        # 创建AgentExecutor
-        self.agent_executor = initialize_agent(
-            tools,
-            self.llm,
-            agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
-            verbose=True,
-            memory=self.memory,
-            handle_parsing_errors=True,
-            max_iterations=5
-        )
-        
-        print("AgentExecutor 初始化完成，支持自主规划和多工具协作")
-    
-    def _summarize_history(self):
-        """对对话历史进行摘要压缩"""
-        if len(self.history) <= 5:
-            return ""
-        
-        # 构建摘要提示
-        history_str = "\n".join([f"用户: {h[0]}\n助手: {h[1]}" for h in self.history[:-5]])
-        
-        summary_prompt = f"""请对以下对话历史进行简要总结，提取关键信息：
+# ==================================================
+# 内置医疗术语数据库（回退方案）
+# ==================================================
+MEDICAL_TERMS = {
+    "高血压": "高血压是指以体循环动脉血压（收缩压≥140mmHg和/或舒张压≥90mmHg）为主要特征，可伴有心、脑、肾等器官功能损害的临床综合征。",
+    "糖尿病": "糖尿病是一组以高血糖为特征的代谢性疾病。长期高血糖会导致眼、肾、心脏、血管、神经的慢性损害。",
+    "阿司匹林": "阿司匹林具有解热镇痛、抗炎、抗血小板聚集作用。常用于预防心脑血管疾病。",
+    "血常规": "血常规是最基本的血液检验，主要指标包括白细胞计数、红细胞计数、血红蛋白浓度和血小板计数。",
+    "肿瘤标志物": "肿瘤标志物是由肿瘤细胞产生或机体对肿瘤反应产生的物质，用于辅助诊断癌症。",
+    "冠心病": "冠心病是冠状动脉粥样硬化性心脏病的简称，由于冠状动脉狭窄导致心肌缺血缺氧。",
+    "心肌梗死": "心肌梗死是冠状动脉急性持续缺血缺氧引起的心肌坏死，临床表现为剧烈胸痛。",
+    "脑卒中": "脑卒中是急性脑血管疾病，分为缺血性和出血性卒中，主要危险因素包括高血压和糖尿病。",
+    "肺炎": "肺炎是终末气道、肺泡和肺间质的炎症，常见病原体包括细菌、病毒、真菌。",
+    "哮喘": "哮喘是一种慢性气道炎症性疾病，特征为可逆性气流受限，典型症状包括喘息和气急。"
+}
 
-{history_str}
-
-总结："""
+# ==================================================
+# 本地 LoRA 模型（Qwen2 专用）
+# ==================================================
+class LocalLoraModel:
+    def __init__(self, lora_path: str, base_model_path: str):
+        self.lora_path = lora_path
+        self.base_model_path = base_model_path
+        self.model = None
+        self.tokenizer = None
+        self.loaded = False
         
-        if self.use_local_model and isinstance(self.llm, tuple):
-            model, tokenizer = self.llm
-            inputs = tokenizer(summary_prompt, return_tensors="pt").to(model.device)
-            with torch.no_grad():
-                outputs = model.generate(
-                    **inputs,
-                    max_length=256,
-                    temperature=0.3,
-                    do_sample=False
-                )
-            summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            if "总结：" in summary:
-                summary = summary.split("总结：")[1].strip()
+        if HAS_PEFT:
+            self._load()
         else:
-            summary = self.llm.predict(summary_prompt)
+            print("⚠️ 缺少 PEFT 库，无法加载 LoRA 模型")
+    
+    def _load(self):
+        if not os.path.exists(self.lora_path):
+            print(f"⚠️ LoRA 路径不存在: {self.lora_path}")
+            return
         
-        return summary
-    
-    def _truncate_history(self):
-        """截断历史，保持最大长度限制"""
-        if len(self.history) > self.max_history_length:
-            # 先进行摘要压缩
-            self.history_summary = self._summarize_history()
-            # 保留最近的历史
-            self.history = self.history[-self.max_history_length // 2:]
-    
-    def _check_tool_call(self, response):
-        """检查响应中是否包含工具调用"""
-        for tool in tools:
-            if tool.name in response:
-                try:
-                    if ":" in response:
-                        parts = response.split(":")
-                        if len(parts) > 1:
-                            param = parts[1].strip()
-                            return tool.func(param)
-                except Exception as e:
-                    return f"工具调用错误: {str(e)}"
-        return None
-    
-    def _reflect_and_adjust(self, user_input, error):
-        """反思错误并调整策略"""
-        reflect_prompt = f"""
-用户问题：{user_input}
-执行错误：{error}
-
-请分析错误原因，并给出调整后的提问方式或解决方案。
-"""
+        if not os.path.exists(self.base_model_path):
+            print(f"⚠️ 基础模型路径不存在: {self.base_model_path}")
+            return
         
-        if self.use_local_model and isinstance(self.llm, tuple):
-            model, tokenizer = self.llm
-            inputs = tokenizer(reflect_prompt, return_tensors="pt").to(model.device)
-            with torch.no_grad():
-                outputs = model.generate(
-                    **inputs,
-                    max_length=512,
-                    temperature=0.5,
-                    do_sample=True
-                )
-            reflection = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        else:
-            reflection = self.llm.predict(reflect_prompt)
-        
-        return reflection
-    
-    def run(self, user_input):
-        """运行agent，处理用户输入（带规划能力）"""
-        # 检查是否启用规划能力
-        if HAS_AGENT and self.enable_planning and not self.use_local_model:
-            return self._run_with_planning(user_input)
-        else:
-            return self._run_basic(user_input)
-    
-    def _run_with_planning(self, user_input):
-        """使用AgentExecutor进行规划执行"""
-        # 更新历史
-        self.history.append((user_input, ""))
-        
-        # 截断历史
-        self._truncate_history()
+        print(f"🔄 加载基础模型: {self.base_model_path}")
+        print(f"🔄 加载 LoRA 权重: {self.lora_path}")
         
         try:
-            # 检索相关文档
-            document_results = self.vector_store.search(user_input)
+            # 1. 加载分词器
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.base_model_path,
+                trust_remote_code=True,
+                local_files_only=True
+            )
             
-            # 将文档检索结果添加到提示中
-            enhanced_input = f"""
-用户问题：{user_input}
-
-参考文档：
-{document_results}
-
-请根据文档内容和你的专业知识回答问题。
-"""
+            # 2. 加载基础模型
+            model = AutoModelForCausalLM.from_pretrained(
+                self.base_model_path,
+                torch_dtype=torch.float16,
+                device_map="auto",
+                trust_remote_code=True,
+                local_files_only=True
+            )
             
-            # 使用AgentExecutor执行
-            for attempt in range(self.max_retries):
+            # 3. 尝试加载 LoRA（多种方式）
+            try:
+                # 方式1：标准加载
+                model = PeftModel.from_pretrained(model, self.lora_path)
+            except Exception as e1:
+                print(f"⚠️ 标准加载失败: {e1}")
                 try:
-                    response = self.agent_executor.run(enhanced_input)
+                    # 方式2：尝试加载配置并修复
+                    config = PeftConfig.from_pretrained(self.lora_path)
+                    # 移除可能导致问题的参数
+                    config_dict = config.to_dict()
+                    config_dict.pop('alora_invocation_tokens', None)
+                    config_dict.pop('alora_ranking_coeff', None)
+                    config_dict.pop('megatron_core', None)
                     
-                    # 检查是否需要进一步处理
-                    if self._needs_follow_up(response):
-                        user_input = self._generate_follow_up(response)
-                        continue
-                    
-                    # 更新历史
-                    self.history[-1] = (user_input, response)
-                    return response
-                    
-                except Exception as e:
-                    # 反思并调整策略
-                    if attempt < self.max_retries - 1:
-                        user_input = self._reflect_and_adjust(user_input, str(e))
-                    else:
-                        return f"多次尝试后仍无法完成任务，请尝试其他方式。错误信息：{str(e)}"
+                    # 尝试从字典重新创建配置
+                    config = PeftConfig.from_dict(config_dict)
+                    model = PeftModel.from_pretrained(model, self.lora_path, config=config)
+                except Exception as e2:
+                    print(f"⚠️ 配置修复加载失败: {e2}")
+                    try:
+                        # 方式3：跳过 embed_tokens 相关的错误
+                        model = PeftModel.from_pretrained(
+                            model, 
+                            self.lora_path,
+                            ignore_mismatched_sizes=True  # 忽略尺寸不匹配
+                        )
+                    except Exception as e3:
+                        print(f"⚠️ 忽略尺寸不匹配加载失败: {e3}")
+                        raise Exception(f"所有加载方式均失败: {e1}, {e2}, {e3}")
+            
+            model.eval()
+            self.model = model
+            self.loaded = True
+            print("✅ LoRA 模型加载成功")
             
         except Exception as e:
-            return f"执行错误: {str(e)}"
+            print(f"❌ LoRA 模型加载失败: {e}")
+            self.loaded = False
     
-    def _run_basic(self, user_input):
-        """基础执行模式（无规划能力）"""
-        # 截断历史
-        self._truncate_history()
+    def infer(self, prompt: str) -> str:
+        if not self.loaded:
+            return None
         
-        # 构建上下文
-        history_str = ""
-        if self.history_summary:
-            history_str = f"对话摘要：{self.history_summary}\n\n"
-        history_str += "\n".join([f"用户: {h[0]}\n助手: {h[1]}" for h in self.history])
-        
-        # 检索相关文档
-        document_results = self.vector_store.search(user_input)
-        
-        # 根据模型类型选择不同的推理方式
-        if self.use_local_model and isinstance(self.llm, tuple):
-            response = self._local_inference(user_input, document_results, history_str)
-        else:
-            # 构建提示模板
-            tools_description = "\n".join([f"- {tool.name}: {tool.description}" for tool in tools])
-            
-            prompt = ChatPromptTemplate.from_template(
-                f"""你是一个专业的医疗行业智能助手。
-
-对话历史：
-{{history}}
-
-用户问题：
-{{input}}
-
-文档检索结果：
-{{document_results}}
-
-可用工具：
-{tools_description}
-
-请提供详细、准确的回答。如果需要使用工具，请按格式输出：工具名称: 参数
-"""
+        try:
+            inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    max_new_tokens=512,
+                    temperature=TEMPERATURE,
+                    do_sample=True,
+                    top_p=0.9
+                )
+            return self.tokenizer.decode(
+                outputs[0][inputs.input_ids.shape[1]:], 
+                skip_special_tokens=True
             )
-            chain = prompt | self.llm | StrOutputParser()
-            
-            response = chain.invoke({
-                "history": history_str,
-                "input": user_input,
-                "document_results": document_results
-            })
-        
-        # 检查是否需要调用工具
-        tool_result = self._check_tool_call(response)
-        
-        if tool_result:
-            # 更新对话历史
-            self.history.append((user_input, response))
-            self.history.append(("工具调用", tool_result))
-            return tool_result
-        else:
-            # 更新对话历史
-            self.history.append((user_input, response))
-            return response
-    
-    def _local_inference(self, user_input, document_results, history_str):
-        """本地模型推理"""
-        model, tokenizer = self.llm
-        
-        tools_description = "\n".join([f"- {tool.name}: {tool.description}" for tool in tools])
-        
-        prompt = f"""你是一个专业的医疗行业智能助手，专注于分析医疗研报和文档，并回答相关专业问题。
+        except Exception as e:
+            print(f"⚠️ LoRA 推理失败: {e}")
+            return None
 
-对话历史：
-{history_str}
-
-用户问题：
-{user_input}
-
-文档检索结果：
-{document_results}
-
-可用工具：
-{tools_description}
-
-请提供详细、准确的回答。如果需要使用工具，请按格式输出：工具名称: 参数
-"""
-        
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_length=1024,
-                temperature=0.7,
-                top_p=0.9,
-                do_sample=True
+# ==================================================
+# API 模型
+# ==================================================
+class ApiModel:
+    def __init__(self):
+        self.available = False
+        try:
+            from langchain_openai import ChatOpenAI
+            self.llm = ChatOpenAI(
+                model=MODEL,
+                temperature=TEMPERATURE,
+                api_key=API_KEY,
+                base_url=BASE_URL
             )
+            self.available = True
+            print("✅ API 模型初始化成功")
+        except Exception as e:
+            print(f"⚠️ API 模型初始化失败: {e}")
+    
+    def infer(self, prompt: str) -> str:
+        if not self.available:
+            return None
+        try:
+            return self.llm.predict(prompt)
+        except Exception as e:
+            print(f"⚠️ API 调用失败: {e}")
+            return None
+
+# ==================================================
+# 医疗助手（智能回退）
+# ==================================================
+class MedicalAssistant:
+    def __init__(self):
+        print("\n" + "="*50)
+        print("🏥 初始化医疗助手...")
         
-        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return response.strip()
+        # 初始化本地 LoRA 模型
+        self.local_model = LocalLoraModel(LORA_PATH, LOCAL_QWEN_PATH)
+        
+        # 初始化 API 模型
+        self.api_model = ApiModel()
+        
+        # 当前使用的模型
+        self.current_model = "fallback"
+        
+        print("="*50 + "\n")
     
-    def _needs_follow_up(self, response):
-        """判断是否需要后续处理"""
-        follow_up_keywords = ["需要更多信息", "请提供", "请补充", "需要确认"]
-        return any(keyword in response for keyword in follow_up_keywords)
+    def answer(self, question: str) -> str:
+        """回答问题，按优先级尝试不同模型"""
+        
+        # 1. 尝试本地 LoRA 模型
+        if self.local_model.loaded:
+            print("🏠 使用本地 LoRA 模型...")
+            response = self.local_model.infer(question)
+            if response:
+                self.current_model = "local"
+                return response
+        
+        # 2. 尝试 API 模型
+        if self.api_model.available:
+            print("☁️ 使用 API 模型...")
+            response = self.api_model.infer(question)
+            if response:
+                self.current_model = "api"
+                return response
+        
+        # 3. 使用内置医疗术语（最终回退）
+        print("📚 使用内置医疗术语...")
+        self.current_model = "fallback"
+        return self._fallback_answer(question)
     
-    def _generate_follow_up(self, response):
-        """生成后续问题"""
-        return f"请提供更多信息以便继续处理：{response}"
-    
-    def clear_history(self):
-        """清空对话历史"""
-        self.history = []
-        self.history_summary = ""
-        if HAS_AGENT and hasattr(self, 'memory'):
-            self.memory.clear()
-    
-    def add_document(self, file_path):
-        """添加文档到系统"""
-        text = self.parser.parse_document(file_path)
-        if "错误" in text:
-            return text
-        result = self.vector_store.add_document(text, metadata={"file_path": file_path})
-        return result
-    
-    def clear_documents(self):
-        """清空所有文档"""
-        return self.vector_store.clear()
+    def _fallback_answer(self, question: str) -> str:
+        """内置医疗术语回退"""
+        question_lower = question.lower()
+        
+        # 精确匹配术语
+        for term, definition in MEDICAL_TERMS.items():
+            if term.lower() in question_lower:
+                return f"📖 **{term}**\n\n{definition}"
+        
+        # 关键词匹配
+        keywords = {
+            "血压": "高血压",
+            "血糖": "糖尿病",
+            "吃药": "用药",
+            "检查": "体检",
+            "化验": "血常规"
+        }
+        
+        for key, term in keywords.items():
+            if key in question_lower and term in MEDICAL_TERMS:
+                return f"📖 **{term}**\n\n{MEDICAL_TERMS[term]}"
+        
+        # 通用回答
+        return """我是医疗研报智能助手，可以为您解答医疗相关问题。
 
-# 配置选项
-USE_LOCAL_MODEL = os.getenv("USE_LOCAL_MODEL", "false").lower() == "true"
-LORA_PATH = os.getenv("LORA_PATH", "./lora_output")
-ENABLE_PLANNING = os.getenv("ENABLE_PLANNING", "true").lower() == "true"
+📚 **我可以帮您：**
+• 解释医疗术语（如高血压、糖尿病等）
+• 说明检查项目的意义
+• 介绍常见疾病的基本知识
 
-# 初始化agent
-API_KEY = os.getenv("OPENAI_API_KEY", "a73fa9b9137441ea9c835949a7c19c5e.an4Y8vj2Fs5QO1He")
-MODEL = os.getenv("MODEL", "glm-5v-turbo")
-TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
-BASE_URL = os.getenv("BASE_URL", "https://open.bigmodel.cn/api/paas/v4/")
+💡 **请尝试询问：**
+• "什么是高血压？"
+• "糖尿病有什么症状？"
+• "血常规检查包括哪些项目？"
 
-# 验证API Key（仅在使用API模式时）
-if not USE_LOCAL_MODEL and (not API_KEY or API_KEY == "your-openai-api-key"):
-    raise ValueError("请在.env文件中设置OPENAI_API_KEY环境变量")
+⚠️ **温馨提示：** 我提供的信息仅供参考，具体诊疗请咨询专业医生。"""
 
-agent = MedicalReportAgent(
-    api_key=API_KEY, 
-    model=MODEL, 
-    temperature=TEMPERATURE, 
-    base_url=BASE_URL,
-    use_local_model=USE_LOCAL_MODEL,
-    lora_path=LORA_PATH,
-    enable_planning=ENABLE_PLANNING
-)
+# ==================================================
+# Flask 服务
+# ==================================================
+assistant = MedicalAssistant()
 
-@app.route('/')
+@app.route("/")
 def index():
-    return send_from_directory('frontend', 'index.html')
+    return send_from_directory("frontend", "index.html")
 
-@app.route('/api/chat', methods=['POST'])
+@app.route("/api/chat", methods=["POST"])
 def chat():
-    data = request.json
-    user_input = data.get('message')
+    data = request.json or {}
+    user_input = data.get("message", "")
     
     if not user_input:
-        return jsonify({"error": "No message provided"}), 400
+        return jsonify({"error": "请输入您的问题"}), 400
     
     try:
-        response = agent.run(user_input)
-        return jsonify({"response": response})
+        response = assistant.answer(user_input)
+        return jsonify({
+            "response": response,
+            "model": assistant.current_model,
+            "time": datetime.now().isoformat()
+        })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "response": "抱歉，我暂时无法回答这个问题。",
+            "error": str(e)
+        })
 
-@app.route('/api/clear', methods=['POST'])
-def clear():
-    agent.clear_history()
-    return jsonify({"message": "History cleared"})
-
-@app.route('/api/upload', methods=['POST'])
-def upload():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file provided"}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No file selected"}), 400
-    
-    try:
-        temp_dir = 'temp'
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
-        
-        file_path = os.path.join(temp_dir, file.filename)
-        file.save(file_path)
-        
-        result = agent.add_document(file_path)
-        
-        os.remove(file_path)
-        
-        return jsonify({"message": result})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/clear_docs', methods=['POST'])
-def clear_docs():
-    try:
-        result = agent.clear_documents()
-        return jsonify({"message": result})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/health', methods=['GET'])
-def health():
-    """健康检查接口"""
+@app.route("/api/models", methods=["GET"])
+def get_models():
+    """获取可用模型状态"""
     return jsonify({
-        "status": "healthy",
-        "service": "medical-report-agent",
-        "model": MODEL,
-        "use_local_model": USE_LOCAL_MODEL,
-        "enable_planning": ENABLE_PLANNING,
-        "version": "1.0.0"
+        "local": assistant.local_model.loaded,
+        "api": assistant.api_model.available,
+        "current": assistant.current_model
     })
 
-if __name__ == '__main__':
-    port = int(os.getenv("PORT", 5000))
-    debug_mode = os.getenv("FLASK_ENV", "production").lower() == "development"
-    app.run(host='0.0.0.0', port=port, debug=debug_mode)
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "healthy",
+        "models": {
+            "local": assistant.local_model.loaded,
+            "api": assistant.api_model.available
+        }
+    })
+
+if __name__ == "__main__":
+    print("\n🚀 启动医疗研报智能助手...")
+    print(f"🌐 访问地址: http://localhost:{PORT}")
+    print(f"📁 LoRA 路径: {LORA_PATH}")
+    print(f"🤖 基础模型: {LOCAL_QWEN_PATH}")
+    print(f"🔑 API 可用: {assistant.api_model.available}")
+    print(f"🏠 本地模型: {assistant.local_model.loaded}")
+    print("\n" + "="*50 + "\n")
+    
+    app.run(host="0.0.0.0", port=PORT, debug=True)
