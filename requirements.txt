@@ -1,32 +1,47 @@
-# 基础依赖
-langchain
-langchain-openai
-python-dotenv
-rich
-flask
-flask-cors
-PyPDF2
-python-docx
-faiss-cpu
-langchain_community
+# ==================================================
+# 医疗智能助手依赖配置
+# ==================================================
+# 支持 Python 3.8+ 的基础版本
+# 如需使用完整的 LoRA 功能，请使用 Python 3.10+ 并安装 peft>=0.19.1
+
+# ==================================================
+# 核心依赖
+# ==================================================
+flask>=2.0.0
+flask-cors>=3.0.0
+python-dotenv>=1.0.0
+rich>=13.0.0
+PyPDF2>=3.0.0
+python-docx>=1.0.0
+faiss-cpu>=1.7.0
+scikit-learn>=1.0.0
+pycryptodome>=3.0.0
+websockets>=10.0.0
+
+# ==================================================
+# LangChain 相关
+# ==================================================
+langchain>=0.1.0
+langchain-openai>=0.1.0
+langchain-community>=0.1.0
 pydantic<2.0
-scikit-learn
-pycryptodome
-websockets
 
-# LoRA微调相关依赖
+# ==================================================
+# 深度学习相关（基础版本）
+# ==================================================
 torch>=2.0.0
-transformers>=4.30.0
+transformers>=4.43.1
 accelerate>=0.20.0
-peft>=0.5.0
-datasets>=2.10.0
-evaluate>=0.4.0
 sentencepiece>=0.1.99
-bitsandbytes>=0.41.0
 safetensors>=0.4.0
-
-# HuggingFace Hub工具
 huggingface-hub>=0.17.0
 
-# 模型下载工具
-huggingface-hub[cli]>=0.17.0
+# ==================================================
+# LoRA 相关依赖（Python 3.10+ 推荐）
+# ==================================================
+# 如需使用完整的 LoRA 功能（训练/推理），请取消注释以下行
+# 并确保 Python 版本 >= 3.10
+# peft>=0.19.1
+# datasets>=2.10.0
+# evaluate>=0.4.0
+# bitsandbytes>=0.41.0

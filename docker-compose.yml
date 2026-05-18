@@ -15,14 +15,22 @@ services:
       - BASE_URL=https://open.bigmodel.cn/api/paas/v4/
       - TEMPERATURE=0.7
       - USE_LOCAL_MODEL=false
-      - LORA_PATH=./lora_medical_terms
+      - LORA_PATH=./lora_medical_sampled
       - ENABLE_PLANNING=true
+      - PORT=5000
     volumes:
       - ./temp:/app/temp
       - ./data:/app/data
+      - ./lora_medical_sampled:/app/lora_medical_sampled
     restart: unless-stopped
     networks:
       - medical-agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   medical-agent-network:
